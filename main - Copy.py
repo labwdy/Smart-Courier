@@ -9,21 +9,24 @@ from tkinter import filedialog
 pygame.init()
 def pilih_peta():
     root = tk.Tk()
-    root.withdraw()
+    root.withdraw()  # Supaya nggak muncul jendela Tkinter utama
     file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg")])
     if file_path:
         return load_image(file_path)
     return None
 
+# Warna tambahan
 BIRU = (0, 0, 255)
 KUNING = (255, 255, 0)
 MERAH = (255, 0, 0)
 PUTIH = (255, 255, 255)
 
+# Konfigurasi window
 WINDOW_WIDTH, WINDOW_HEIGHT = 1000, 700
 window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("Simulasi Smart Courier")
 
+# Load gambar
 def load_image(path):
     if not os.path.exists(path):
         print(f"❌ File tidak ditemukan: {path}")
@@ -41,24 +44,29 @@ mobil_ori = pygame.transform.scale(load_image("mobil.png"), (50, 30))
 bendera_kuning = pygame.transform.scale(load_image("source_flag.png"), (30, 30))
 bendera_merah = pygame.transform.scale(load_image("destination_flag.png"), (30, 30))
 
+# Inisialisasi posisi mobil
 mobil_rect = mobil_ori.get_rect()
 mobil_rect.topleft = (100, 100)
 mobil_arah = "kanan"
 
+# Kecepatan mobil
 kecepatan = 5
 mengantar = False
 
+# Anti-nyangkut
 last_positions = []
 nyangkut_counter = 0
 threshold_stuck = 60
 threshold_movement = 3
 
+# Cek apakah berada di jalan
 def is_on_road(x, y):
     if 0 <= x + 25 < peta.get_width() and 0 <= y + 15 < peta.get_height():
         color = peta.get_at((x + 25, y + 15))
         return 90 <= color.r <= 150 and 90 <= color.g <= 150 and 90 <= color.b <= 150
     return False
 
+# Dapatkan posisi acak di jalan
 def acak_posisi():
     while True:
         x = random.randint(0, peta.get_width() - 50)
@@ -69,6 +77,7 @@ def acak_posisi():
 source_pos = acak_posisi()
 dest_pos = acak_posisi()
 
+# Rotasi mobil
 def rotasi_mobil(arah):
     if arah == "kanan":
         return mobil_ori
@@ -92,6 +101,7 @@ def is_facing(mobil_rect, arah, target_pos):
         return True
     return False
 
+# A* Pathfinding
 def astar(start, goal):
     def heuristic(a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
@@ -125,6 +135,7 @@ def astar(start, goal):
                 heapq.heappush(open_set, (f_score[neighbor], neighbor))
     return []
 
+# Gerak otomatis
 path = []
 def move_along_path(mobil_rect, path, arah):
     if not path:
@@ -144,6 +155,7 @@ def move_along_path(mobil_rect, path, arah):
         path.pop(0)
     return arah
 
+# Loop utama
 clock = pygame.time.Clock()
 running = True
 while running:
@@ -209,19 +221,23 @@ while running:
                 path = astar(mobil_rect.topleft, dest_pos)
                 last_positions.clear()
 
+    # Jika keluar dari jalan, kembalikan posisi
     if not is_on_road(mobil_rect.x, mobil_rect.y):
         mobil_rect.topleft = old_position
 
+    # Ambil paket
     if not mengantar and mobil_rect.colliderect(pygame.Rect(source_pos, (30, 30))) and is_facing(mobil_rect, mobil_arah, source_pos):
         mengantar = True
         path = []
         print("📦 Paket diambil!")
 
+    # Antar paket
     if mengantar and mobil_rect.colliderect(pygame.Rect(dest_pos, (30, 30))):
         mengantar = False
         path = []
         print("✅ Paket diantar!")
 
+    # Kamera mengikuti mobil
     camera_x = max(0, min(mobil_rect.centerx - WINDOW_WIDTH // 2, peta.get_width() - WINDOW_WIDTH))
     camera_y = max(0, min(mobil_rect.centery - WINDOW_HEIGHT // 2, peta.get_height() - WINDOW_HEIGHT))
 
@@ -230,25 +246,31 @@ while running:
     window.blit(bendera_merah, (dest_pos[0] - camera_x, dest_pos[1] - camera_y))
     window.blit(rotasi_mobil(mobil_arah), (mobil_rect.x - camera_x, mobil_rect.y - camera_y))
 
+    # ========== MINI MAP ==========
     MINI_MAP_WIDTH, MINI_MAP_HEIGHT = 200, 140
     MINI_SCALE_X = MINI_MAP_WIDTH / peta.get_width()
     MINI_SCALE_Y = MINI_MAP_HEIGHT / peta.get_height()
     MINI_POS_X, MINI_POS_Y = WINDOW_WIDTH - MINI_MAP_WIDTH - 20, WINDOW_HEIGHT - MINI_MAP_HEIGHT - 20
 
+    # Gambar latar mini map (dari peta asli, diperkecil)
     mini_peta = pygame.transform.smoothscale(peta, (MINI_MAP_WIDTH, MINI_MAP_HEIGHT))
     
+    # Gambar border minimap terlebih dahulu
     pygame.draw.rect(window, PUTIH, (MINI_POS_X - 2, MINI_POS_Y - 2, MINI_MAP_WIDTH + 4, MINI_MAP_HEIGHT + 4), 2)
     
+    # Gambar minimap
     window.blit(mini_peta, (MINI_POS_X, MINI_POS_Y))
 
+    # Fungsi untuk menggambar titik di minimap
     def draw_mini_dot(pos, color, size=4):
         mini_x = int(pos[0] * MINI_SCALE_X) + MINI_POS_X
         mini_y = int(pos[1] * MINI_SCALE_Y) + MINI_POS_Y
         pygame.draw.circle(window, color, (mini_x, mini_y), size)
 
-    draw_mini_dot((mobil_rect.x + 25, mobil_rect.y + 15), BIRU)
-    draw_mini_dot((source_pos[0] + 15, source_pos[1] + 15), KUNING)
-    draw_mini_dot((dest_pos[0] + 15, dest_pos[1] + 15), MERAH)
+    # Gambar titik-titik penting di minimap
+    draw_mini_dot((mobil_rect.x + 25, mobil_rect.y + 15), BIRU)  # Posisi kurir (pusat mobil)
+    draw_mini_dot((source_pos[0] + 15, source_pos[1] + 15), KUNING)  # Posisi source (pusat bendera)
+    draw_mini_dot((dest_pos[0] + 15, dest_pos[1] + 15), MERAH)  # Posisi destination (pusat bendera)
 
     pygame.display.flip()
 
