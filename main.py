@@ -133,12 +133,15 @@ def move_along_path(mobil_rect, path, arah):
     dx = target[0] - mobil_rect.x
     dy = target[1] - mobil_rect.y
 
-    if abs(dx) > abs(dy):
+    if abs(dx) > abs(dy) + 3:
         mobil_rect.x += kecepatan if dx > 0 else -kecepatan
         arah = "kanan" if dx > 0 else "kiri"
-    else:
+    elif abs(dy) > abs(dx) + 3:
         mobil_rect.y += kecepatan if dy > 0 else -kecepatan
         arah = "bawah" if dy > 0 else "atas"
+    else:
+        mobil_rect.x += kecepatan if dx > 0 else -kecepatan
+        mobil_rect.y += kecepatan if dy > 0 else -kecepatan
 
     if abs(dx) < kecepatan and abs(dy) < kecepatan:
         path.pop(0)
