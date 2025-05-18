@@ -125,26 +125,30 @@ def astar(start, goal):
                 heapq.heappush(open_set, (f_score[neighbor], neighbor))
     return []
 
+mengantar = True
+path = astar(source_pos, dest_pos)
+mobil_rect.topleft = source_pos
+
 path = []
 def move_along_path(mobil_rect, path, arah):
     if not path:
         return arah
+
     target = path[0]
     dx = target[0] - mobil_rect.x
     dy = target[1] - mobil_rect.y
 
-    if abs(dx) > abs(dy) + 3:
+    if abs(dx) > 0:
         mobil_rect.x += kecepatan if dx > 0 else -kecepatan
         arah = "kanan" if dx > 0 else "kiri"
-    elif abs(dy) > abs(dx) + 3:
+    elif abs(dy) > 0:
         mobil_rect.y += kecepatan if dy > 0 else -kecepatan
         arah = "bawah" if dy > 0 else "atas"
-    else:
-        mobil_rect.x += kecepatan if dx > 0 else -kecepatan
-        mobil_rect.y += kecepatan if dy > 0 else -kecepatan
 
-    if abs(dx) < kecepatan and abs(dy) < kecepatan:
+    if abs(dx) <= kecepatan and abs(dy) <= kecepatan:
+        mobil_rect.topleft = target  # Snap to grid
         path.pop(0)
+
     return arah
 
 clock = pygame.time.Clock()
@@ -252,6 +256,12 @@ while running:
     draw_mini_dot((mobil_rect.x + 25, mobil_rect.y + 15), BIRU)
     draw_mini_dot((source_pos[0] + 15, source_pos[1] + 15), KUNING)
     draw_mini_dot((dest_pos[0] + 15, dest_pos[1] + 15), MERAH)
+
+    # Gambar path dengan garis biru terang
+    if path:
+        path_screen = [(x - camera_x + 25, y - camera_y + 15) for (x, y) in path]
+        if len(path_screen) > 1:
+            pygame.draw.lines(window, (0, 255, 255), False, path_screen, 2)
 
     pygame.display.flip()
 
