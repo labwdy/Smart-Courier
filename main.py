@@ -63,15 +63,13 @@ if peta is None:
 mobil_ori = pygame.transform.scale(load_image("mobil.png"), (50, 30))
 bendera_kuning = pygame.transform.scale(load_image("source_flag.png"), (30, 30))
 bendera_merah = pygame.transform.scale(load_image("destination_flag.png"), (30, 30))
-
 mobil_rect = mobil_ori.get_rect()
-mobil_rect.topleft = (100, 100)
-mobil_arah = "kanan"
 
-kecepatan = 5
-mengantar = False
+kecepatan = 7
+mobil_arah = "kanan"
 program_dimulai = False
 menuju_source = False
+mengantar = False
 
 last_positions = []
 threshold_stuck = 60
@@ -85,12 +83,24 @@ def is_on_road(x, y):
 
 def acak_posisi():
     while True:
-        x = random.randint(0, peta.get_width() - 50)
-        y = random.randint(0, peta.get_height() - 50)
+        x = random.randint(0, peta.get_width() - mobil_rect.width)
+        y = random.randint(0, peta.get_height() - mobil_rect.height)
         if is_on_road(x, y):
             return x, y
 
+def acak_posisi_dekat(center, jarak_maks=150):
+    for _ in range(1000):
+        dx = random.randint(-jarak_maks, jarak_maks)
+        dy = random.randint(-jarak_maks, jarak_maks)
+        x = center[0] + dx
+        y = center[1] + dy
+        if 0 <= x < peta.get_width() - mobil_rect.width and 0 <= y < peta.get_height() - mobil_rect.height:
+            if is_on_road(x, y):
+                return x, y
+    return acak_posisi()
+
 source_pos = acak_posisi()
+mobil_rect.topleft = acak_posisi_dekat(source_pos)
 dest_pos = acak_posisi()
 
 path = []
@@ -108,15 +118,10 @@ def rotasi_mobil(arah):
 def is_facing(mobil_rect, arah, target_pos):
     dx = target_pos[0] - mobil_rect.centerx
     dy = target_pos[1] - mobil_rect.centery
-    if arah == "kanan" and dx > 0:
-        return True
-    elif arah == "kiri" and dx < 0:
-        return True
-    elif arah == "atas" and dy < 0:
-        return True
-    elif arah == "bawah" and dy > 0:
-        return True
-    return False
+    return (arah == "kanan" and dx > 0) or \
+           (arah == "kiri" and dx < 0) or \
+           (arah == "atas" and dy < 0) or \
+           (arah == "bawah" and dy > 0)
 
 def astar(start, goal):
     def heuristic(a, b):
@@ -130,7 +135,6 @@ def astar(start, goal):
 
     while open_set:
         _, current = heapq.heappop(open_set)
-
         if heuristic(current, goal) < 10:
             path = []
             while current in came_from:
@@ -154,7 +158,6 @@ def astar(start, goal):
 def move_along_path(mobil_rect, path, arah):
     if not path:
         return arah
-
     target = path[0]
     dx = target[0] - mobil_rect.x
     dy = target[1] - mobil_rect.y
@@ -165,11 +168,10 @@ def move_along_path(mobil_rect, path, arah):
     elif abs(dy) > 0:
         mobil_rect.y += kecepatan if dy > 0 else -kecepatan
         arah = "bawah" if dy > 0 else "atas"
-
+        
     if abs(dx) <= kecepatan and abs(dy) <= kecepatan:
         mobil_rect.topleft = target
         path.pop(0)
-
     return arah
 
 clock = pygame.time.Clock()
@@ -189,20 +191,20 @@ while running:
                 status_pesan = "Menuju ke sumber sortir (bendera kuning)..."
                 tampilkan_petunjuk_awal = False
             elif event.key == pygame.K_r:
-                mobil_rect.topleft = acak_posisi()
+                mobil_rect.topleft = acak_posisi_dekat(source_pos)
             elif event.key == pygame.K_l:
                 new_peta = pilih_peta()
                 if new_peta:
                     peta = new_peta
                     source_pos = acak_posisi()
+                    mobil_rect.topleft = acak_posisi_dekat(source_pos)
                     dest_pos = acak_posisi()
-                    mobil_rect.topleft = acak_posisi()
                     path = []
                     status_pesan = "Peta baru dimuat"
             elif event.key == pygame.K_t:
                 source_pos = acak_posisi()
+                mobil_rect.topleft = acak_posisi_dekat(source_pos)
                 dest_pos = acak_posisi()
-                mobil_rect.topleft = acak_posisi()
                 path = []
                 program_dimulai = True
                 menuju_source = True
@@ -210,11 +212,11 @@ while running:
                 status_pesan = "Bendera diacak. Menuju ke sumber sortir."
 
     old_position = mobil_rect.topleft
-    keys = pygame.key.get_pressed()
 
     if program_dimulai:
         if menuju_source and not path:
             path = astar(mobil_rect.topleft, source_pos)
+
         elif menuju_source:
             mobil_arah = move_along_path(mobil_rect, path, mobil_arah)
             if mobil_rect.colliderect(pygame.Rect(source_pos, (30, 30))) and is_facing(mobil_rect, mobil_arah, source_pos):
@@ -222,15 +224,36 @@ while running:
                 mengantar = True
                 path = astar(mobil_rect.topleft, dest_pos)
                 status_pesan = "Paket diambil! Menuju ke tujuan."
+
         elif mengantar and not path:
             path = astar(mobil_rect.topleft, dest_pos)
+
         elif mengantar:
             mobil_arah = move_along_path(mobil_rect, path, mobil_arah)
+
+            last_positions.append(mobil_rect.topleft)
+
+            if len(last_positions) > threshold_stuck:
+                last_positions.pop(0)
+
+                moved = any(
+                    abs(last_positions[-1][0] - pos[0]) > threshold_movement or
+                    abs(last_positions[-1][1] - pos[1]) > threshold_movement
+                    for pos in last_positions
+                )
+
+                if not moved:
+                    print("⚠️ Mobil nyangkut! Reset ke source.")
+                    mobil_rect.topleft = source_pos
+                    path = astar(mobil_rect.topleft, dest_pos)
+                    last_positions.clear()
+
             if mobil_rect.colliderect(pygame.Rect(dest_pos, (30, 30))):
                 mengantar = False
                 program_dimulai = False
                 path = []
                 status_pesan = "Paket berhasil diantar!"
+
 
     if not is_on_road(mobil_rect.x, mobil_rect.y):
         mobil_rect.topleft = old_position
